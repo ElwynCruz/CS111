@@ -1,0 +1,257 @@
+/*
+NAME:  Elwyn Cruz
+EMAIL: ElwynCruz@g.ucla.edu
+ID:   104977892
+ */
+#include <termios.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <poll.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <mcrypt.h>
+#include <fcntl.h>
+
+struct termios save;
+const char crlf[] = {0x0D, 0x0A};
+
+int fdSocket, fdLog;
+
+int port_flag = 0;
+int log_flag = 0;
+int encrypt_flag = 0;
+int portNum;
+int logfile;
+int fdKey;
+MCRYPT fdEncrypt, fdDecrypt;
+char* IV1;
+void restore_original() {
+  tcsetattr(0, TCSANOW, &save);
+  close(fdSocket);
+  if (log_flag) {
+    close(logfile);
+  }
+}
+
+int main(int argc, char* argv[]){
+
+  int c;
+  char* key;
+  static struct option long_options[] = {
+    { "port"   , required_argument, 0, 'p'},
+    { "log"    , required_argument, 0, 'l'},
+    { "encrypt", required_argument, 0, 'e'},
+    {0         , 0                , 0,  0 }
+  };
+  
+
+
+  while ((c = getopt_long(argc, argv, "p:l:e:", long_options, NULL)) != -1) {
+    switch (c) {
+    case 'p':
+      port_flag = 1;
+      portNum = atoi(optarg);
+      break;
+    case 'l':
+      logfile = creat(optarg, S_IRWXU);
+      if (logfile < 0) {
+	fprintf(stderr, "Error: Could not create log file\n");
+	exit(1);
+      }
+      log_flag = 1;
+      break;
+    case 'e':
+      fdKey = open(optarg, O_RDONLY);
+      struct stat st;
+      if (fstat(fdKey, &st) < 0) {
+	close(fdKey);
+	fprintf(stderr, "Error: fail to return info about the specified key file.\n");
+	exit(1);
+      }
+      int size = st.st_size;
+      key = (char*) malloc(size);
+      read(fdKey, key, size);
+      close(fdKey);
+      
+      fdEncrypt = mcrypt_module_open("twofish", NULL, "cfb", NULL);
+      if (fdEncrypt == MCRYPT_FAILED) {
+	fprintf(stderr, "Error: could not open module\n");
+	exit(1);
+      }
+      IV1 = malloc(mcrypt_enc_get_iv_size(fdEncrypt));
+      int i;
+      for(i = 0; i < mcrypt_enc_get_iv_size(fdEncrypt); i++) {
+	IV1[i] = rand();
+      }
+      if (mcrypt_generic_init(fdEncrypt, key, 16, IV1) < 0) {
+	fprintf(stderr, "Error: could not initialize encryption\n");
+	exit(1);
+      }
+      // decryption
+
+      fdDecrypt = mcrypt_module_open("twofish", NULL, "cfb", NULL);
+      if (fdDecrypt == MCRYPT_FAILED) {
+	fprintf(stderr, "Error: could not open module\n");
+	exit(1);
+      }
+      if (mcrypt_generic_init(fdDecrypt, key, 16, IV1) < 0) {
+	fprintf(stderr, "Error: Fail to initialize decryption.\n");
+	exit(1);
+      }
+
+      encrypt_flag = 1;
+      break;
+
+    default: // incorrect arg
+      fprintf(stderr, "Usage: ./lab1b --port=[portNum]\n");
+      exit(1);
+    }
+  }
+  
+  //store original terminal settings
+  tcgetattr(0, &save);
+  struct termios changes;
+  tcgetattr(0, &changes);
+
+  //changes from spec
+  changes.c_iflag = ISTRIP;  /* only lower 7 bits*/
+  changes.c_oflag = 0;       /* no processing*/
+  changes.c_lflag = 0;       /* no processing*/
+  tcsetattr(0, TCSANOW, &changes);
+  
+
+  if (!port_flag) {
+    // no port
+    fprintf(stderr, "Port argument is required\n");
+    restore_original();
+    exit(1);    
+  }
+
+  // make socket
+  fdSocket = socket(AF_INET, SOCK_STREAM, 0);
+  if (fdSocket < 0) {  // error
+    fprintf(stderr, "Could not open socket\n");
+    restore_original();
+    exit(1);
+  }      
+
+  //get host info
+  struct hostent *h = gethostbyname("localhost");
+  if (h == NULL) {  // error
+    fprintf(stderr, "Could not get host info\n");
+    restore_original();
+    exit(1);
+  }
+  
+  // struct containing IP address
+  struct sockaddr_in serverAddr;
+  memset((char *) &serverAddr, 0, sizeof(serverAddr));
+  serverAddr.sin_family = AF_INET;
+  serverAddr.sin_port = htons(portNum);
+  memcpy((char *)h->h_addr, (char *)&serverAddr.sin_addr.s_addr, h->h_length);
+
+  
+  //connect
+  if (connect(fdSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0){
+    fprintf(stderr, "Could not connect to server\n");
+    restore_original();
+    exit(1);
+  }
+  
+
+  struct pollfd inputs[2];
+  inputs[0].fd = 0;
+  inputs[0].events = POLLIN;
+
+  inputs[1].fd = fdSocket;
+  inputs[1].events = POLLIN;
+
+  while (1) {
+    if (poll(inputs, 2, 0) < 0) {  // error
+      fprintf(stderr, "Poll failed\n");
+      restore_original();
+      exit(1);
+    }
+    else {
+      if (inputs[0].revents == POLLIN) {  // data to read from stdin
+	char buffer[256]; // arbitrary buffer size
+	//memset((char *) &buf, 0, sizeof(buf));
+	int i = 0;
+	i = read(0, buffer, 256);         
+	int j;
+	for (j = 0; j < i; j++) {
+	  if (buffer[j] == 0x0D || buffer[j] == 0x0A) { // CRLF
+	    write(1,crlf, 2);
+	  }
+	  else {    // regular
+ 	    write(1, buffer+j, 1); 
+	  }
+
+	  if (encrypt_flag) {
+	    mcrypt_generic(fdEncrypt, buffer+j, 1);
+	  }
+	  
+	  write(fdSocket, buffer+j, 1); // write to socket
+	  
+	  if (log_flag) {
+	    char log[] = "SENT 1 byte: ";
+	    write(logfile, log, 14);
+	    write(logfile, buffer+j, 1);
+	    write(logfile, "\n",1);
+	  }
+
+	}
+      }
+      else if (inputs[0].revents == POLLERR) {
+	fprintf(stderr, "Poll error with stdin\n");
+	exit(1);
+      }
+      if (inputs[1].revents == POLLIN) { // input from socket
+	char buffer[256]; // arbitrary buffer size
+	int i = 0;
+	i = read(fdSocket, buffer, 256);  
+	if (i == 0) {
+	  break;
+	}
+
+	int j;
+	for (j = 0; j < i; j++) {
+
+	  
+	    
+	  if (log_flag) {
+	    char log[] = "RECEIVED 1 bytes: ";
+	    write(logfile, log, 18);
+	    write(logfile, buffer+j, 1);
+	    write(logfile, "\n", 1);
+	  }
+
+	  if (encrypt_flag) {
+	    mdecrypt_generic(fdDecrypt, buffer+j, 1);
+	  }
+	  
+	  if (buffer[j] == 0x0D || buffer[j] == 0x0A) { // CRLF
+	    write(1,crlf, 2);
+	  }	
+	  else {
+	    write(1, buffer+j, 1);
+	  }
+	  
+	  
+	}
+      }
+      else if (inputs[1].revents == POLLERR || inputs[1].revents & POLLHUP) {
+	restore_original();
+	exit(0);
+      }
+    }
+  }
+  restore_original();
+  return 0;
+}

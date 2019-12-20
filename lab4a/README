@@ -1,0 +1,13 @@
+NAME: Elwyn Cruz
+EMAIL: ElwynCruz@g.ucla.edu
+ID: 104977892
+
+Serial Number: BBGW19010791
+MAC: 2CF7F106A2EB
+
+Included Files:
+my_beaglebone.jpg - a selfie of me and my Beaglebone
+connected.png - screenshot showing output of ifconfig command
+copy.png - screenshot showing successful copy using pscp
+build_run.png - screenshot showing successful compile and run of helloworld
+git.png - screenshot showing installation of git and cloning of repository

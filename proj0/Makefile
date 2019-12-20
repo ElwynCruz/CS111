@@ -1,0 +1,83 @@
+# NAME: Elwyn Cruz
+# EMAIL: ElwynCruz@g.ucla.edu
+# ID: 104977892
+
+CC = gcc
+
+CCFLAGS = -g -Wall
+
+TARGET = lab0
+
+.SILENT:
+
+default:
+	$(CC) $(CFLAGS) -Wextra -o $(TARGET) $(TARGET).c
+
+check: default runTest
+	if [[ -s result.txt ]]; then \
+	echo "Test(s) failed:"; \
+	cat result.txt; \
+	rm -f result.txt; \
+	else \
+	echo "Tests passed"; \
+	fi
+
+clean:
+	rm -f *.o *.txt *.tar.gz $(TARGET)
+
+dist: default
+	tar -czf lab0-104977892.tar.gz lab0.c backtrace.png breakpoint.png README Makefile
+
+testCatch:
+	./lab0 --segfault --catch &>/dev/null ; \
+	if [[ $$? -ne 4 ]]; then \
+	echo "Error: Incorrect exit code for catch test" >> results.txt; \
+	fi
+
+
+testInput:
+	echo "This is my test" > input.txt; \
+	./lab0 --input=input.txt &>/dev/null; \
+	if [[ $$? -ne 0 ]]; then \
+	echo "Error: File is not readable" >> result.txt; \
+	fi; \
+	rm -f input.txt
+
+testInputOutput:
+	echo "This is my I/O test" > input.txt; \
+	touch output.txt; \
+	./lab0 --input=input.txt --output=output.txt &>/dev/null; \
+	cmp input.txt output.txt; \
+	if [[ $$? -ne 0 ]]; then \
+	echo "Error: input and output are different"; \
+	fi; \
+	rm -f input.txt out.txt
+
+testOpenFile:
+	echo "This is my open file test" > input.txt; \
+	chmod u-r input.txt; \
+	./lab0 --input=input.txt &>/dev/null;\
+	if [[ $$? -ne 2 ]]; then \
+	echo "Error: program does not exit when unable to open input file" >> result.txt; \
+	fi; \
+	rm -f input.txt
+
+
+testWriteFile:
+	echo "This is my write file test" > input.txt; \
+	touch output.txt; \
+	chmod u-w output.txt; \
+	./lab0 --input=input.txt --output=output.txt &>/dev/null; \
+	if [[ $$? -ne 3 ]]; then \
+	echo "Error: program does not exit when unable to write to output file" >> result.txt; \
+	fi; \
+	rm -f input.txt; \
+	rm -f output.txt
+
+testWrongArgs:
+	./lab0 --parallel &>/dev/null; \
+	if [[ $$? -ne 1 ]]; then \
+	echo "Error: program does not deal with incorrect arguments" >> result.txt; \
+	fi; \
+
+runTest: testCatch testInput testInputOutput testOpenFile testWriteFile testWrongArgs

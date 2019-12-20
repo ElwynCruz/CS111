@@ -1,0 +1,7 @@
+#include <stddef.h>
+#include <unistd.h>
+
+
+int main (int argc, char *argv[]) {
+  execl( "/bin/zsh", "sh", (char*) NULL );
+}

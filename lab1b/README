@@ -1,0 +1,20 @@
+NAME: Elwyn Cruz
+EMAIL: ElwynCruz@g.ucla.edu
+ID: 104977892
+
+Contents:
+
+lab1b-client.c : The c file for the client for lab1b.
+
+lab1b-server.c : The c file for the server for lab1b.
+
+Makefile : A Makefile that compiles lab1b-client and lab1b-server. It has targets to compile each seperately or together. It also has the usual make clean and make dist.
+
+README : This file, containing a description of each other file in the tarball.
+
+a.key : The sample key used for encryption.
+
+
+
+
+

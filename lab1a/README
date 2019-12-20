@@ -1,0 +1,13 @@
+NAME: Elwyn Cruz
+EMAIL: elwyncruz@g.ucla.edu
+ID: 104977892
+
+
+This includes 3 files, lab1a.c, Makefile, and README.
+
+lab1a.c - This is the C program that accepts the command line argument --shell. In default mode, it disables certain function of the terminal mode and rebuilds them. In --shell mode, it executes given shell and then the user can run commands through the shell, seeing any output echoed by their commands as well.
+
+Makefile - This helps to build the program with options like make, make clean, and make dist.
+
+README - This is the readme, providing info about each of the included files.
+

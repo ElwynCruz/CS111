@@ -1,0 +1,93 @@
+NAME: Elwyn Cruz
+EMAIL: ElwynCruz@g.ucla.edu
+ID: 104977892
+
+From the data, it seems that 1000 iterations will consistenly produce an error in the result.
+
+QUESTION 2.1.1 - causing conflicts:
+Why does it take many iterations before errors are seen?
+It takes many iterations before errors are seen because an error only occurs if a context switch happens during the critical section, which is the add operation. This isn't particularly likely at low iterations, since a context switch happening at exactly that moment isn't particularly likely. With many iterations, it takes more time to perform all the adds, and it also has more opportunities to have a context switch in this critical section. 
+
+Why does a significantly smaller number of iterations so seldom fail?
+A smaller number of iterations seldomly fails because the less number of iterations means the less number of times we enter the critical section, so there's less of a probability of a context switch happening in the critical section.
+
+
+QUESTION 2.1.2 - cost of yielding:
+Why are the --yield runs so much slower?
+The --yield runs are so much slower since it forces the executing threat to give up control every call to add. This adds much more overhead, causing for a much slower overall runtime.
+
+Where is the additional time going?
+The additional time is going towards the overhead from performing a context switch on each add. 
+Is it possible to get valid per-operation timings if we are using the --yield option?
+No, since it includes so much more overhead.
+
+If so, explain how. If not, explain why not.
+The added time from all the overhead will contribute a majority of the time, as we can tell from how much slower the yield runs are. Thus the result will more accurately tell the cost of context switches instead of the operations.
+
+TION 2.1.3 - measurement errors:
+Why does the average cost per operation drop with increasing iterations?
+The total cost is equal to thread creation + total cost of operations. Thus as we add more iterations, we increase total cost of operations, which lowers the percent thread creation contributes towards the total cost. Thus when we divide the total cost by the total time, we get a smaller number for increasing iterations. In reality, the average cost per operation is not dropping, but approaching the real average cost per iteration.
+
+If the cost per iteration is a function of the number of iterations, how do we know how many iterations to run (or what the "correct" cost is)?
+Theoretically, we would run the program with an infinite number of iterations to get the the actual average cost per operation. However, since this isn't feasible, we can also examine the graphs to see the cost seems to be decreasing exponentially. This can be explained by our previous observation, that the average cost per operation is approaching a limit, which would be the real average cost per iteration. So if we increase the number of iterations enough, we should reach a point where increasing iterations more negligibly decreases cost per operation, at which point we will have the true average cost per operation.
+
+QUESTION 2.1.4 - costs of serialization:
+Why do all of the options perform similarly for low numbers of threads?
+When there's less threads, they all perform similarly since there is less overhead.
+
+Why do the three protected operations slow down as the number of threads rises?
+As the number of threads increase, the amount of overhead increases as well, and each thread spends more time waiting for locks instead of performing useful work.
+
+QUESTION 2.2.1 - scalability of Mutex
+Compare the variation in time per mutex-protected operation vs the number of threads in Part-1 (adds) and Part-2 (sorted lists).
+In part 1, the time per mutex-protected operation seemed to increase up to a limit of around 100ns. In part 2, it seems to steadily be increasing with the number of threads. Thus there's more variation in the average cost from part 1 than in part 2.
+
+Comment on the general shapes of the curves, and explain why they have this shape.
+The graph for part 1 looks like an exponential decay, as it increases quickly at first and levels off later. The graph for part 2 appears more linear. This can be explained by the cost of thread creation being amortized in part 1 so the cost approaches the actual average cost per operation. For part 2, the number of threads competing for a single lock increases as the number of threads increase, so the cost per operation increases steadily.
+
+Comment on the relative rates of increase and differences in the shapes of the curves, and offer an explanation for these differences.
+The relative rate for the linked lists seem was gradually increasing due to the linked list needing a large critical section. Addition on the other hand seemed to scale much better since it seems to level off as more threads are added. Thus it is likely the size of the critical section that accounts for the difference in the two graphs.
+
+QUESTION 2.2.2 - scalability of spin locks
+
+Compare the variation in time per protected operation vs the number of threads for list operations protected by Mutex vs Spin locks. Comment on the general shapes of the curves, and explain why they have this shape.
+Compared to Mutex, spin locks usually have a greater cost per operation. This is due to threads wasting cycles spinning instead of being able to do productive work. But from my data, it looks like spin locks had a generally lower cost per operation, likely due to the computer using multiple processors, so each thread did not have to spend too long spinning.
+
+Comment on the relative rates of increase and differences in the shapes of the curves, and offer an explanation for these differences.
+The two curves started at around the same spot. Mutex increased faster, likely due to the more overhead of constantly performing context switches, while spin locks could wait and shortly grab the lock after a time without performing a context switch.
+
+Included files:
+README - this file, containing the answer to the questions as well as descriptions for the other files.
+
+SortedList.h - the provided header file for a Sorted List
+
+SortedList.c - our implementation of a doubly linked circular linked list
+
+Makefile - the make file that is used to build, test, and graph data.
+
+lab2_add.c - our c program that uses adds to show the consequences of race conditions and solves it using different approaches.
+
+lab2_list.c - our c program that uses a linked list to show race conditions and solves them using different locks.
+
+lab2_add.csv - the csv produced from running multiple tests using our lab2_add
+
+lab2_list.csv - the csv produced from running multiple tests using our lab2_list
+
+lab2_add.gp - the provided script to graph our add data
+
+lab2_list.gp - the provided script to graph our list data
+    - NOTE: I could not figure out how to change the x-axis on lab2_list-4.png, so it only shows for threads=1,2,4.
+
+lab2_add-1.png - threads and iterations required to generate a failure (with and without yields)
+lab2_add-2.png - average time per operation with and without yields.
+lab2_add-3.png - average time per (single threaded) operation vs. the number of iterations.
+lab2_add-4.png - threads and iterations that can run successfully with yields under each of the synchronization options.
+lab2_add-5.png - average time per (protected) operation vs. the number of threads.
+
+lab2_list-1.png - average time per (single threaded) unprotected operation vs. number of iterations (illustrating the correction of the per-operation cost for the list length).
+lab2_list-2.png - threads and iterations required to generate a failure (with and without yields)
+lab2_list-3.png - iterations that can run (protected) without failure.
+lab2_list-4.png - (length-adjusted) cost per operation vs the number of threads for the various synchronization options.
+
+getData.sh - a script to run the tests on lab2_add
+getListData.sh - a script to run the tests on lab2_list

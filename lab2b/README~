@@ -1,0 +1,71 @@
+NAME: Elwyn Cruz
+EMAIL: ElwynCruz@g.ucla.edu
+ID: 104977892
+
+QUESTION 2.3.1 - CPU time in the basic list implementation:
+Where do you believe most of the CPU time is spent in the 1 and 2-thread list tests ?
+
+I think most of the CPU time is spent in the critical sections, preforming the insert, length, lookup, and delete operations, for the 1 and 2 thread list tests.
+
+Why do you believe these to be the most expensive parts of the code?
+The threads won't have to wait very long or at all for a lock since they're only sharing with at most one other thread.
+
+
+Where do you believe most of the CPU time is being spent in the high-thread spin-lock tests?
+For high-thread spin-lock tests, most of the time is spent spinning, since multiple threads will be waiting for the lock to be released.
+
+Where do you believe most of the CPU time is being spent in the high-thread mutex tests?
+Most of the time is probably spent in context switches, since each time a thread finds the lock is held, it goes to sleep and issues a context switch.
+
+QUESTION 2.3.2 - Execution Profiling:
+Where (what lines of code) are consuming most of the CPU time when the spin-lock version of the list exerciser is run with a large number of threads?
+
+The line of code consuming most of the CPU time with the spin-lock version run with a large number of threads is:
+    while (__sync_lock_test_and_set(&lock, 1));
+
+Why does this operation become so expensive with large numbers of threads?
+This operation becomes so expensive with a large number of threads since we are more likely to burn cycles spinning and waiting for the lock since many threads are contesting one lock.
+
+QUESTION 2.3.3 - Mutex Wait Time:
+Look at the average time per operation (vs. # threads) and the average wait-for-mutex time (vs. #threads).
+Why does the average lock-wait time rise so dramatically with the number of contending threads?
+At any time only one thread can access the critical section, so all other threads are waiting. As we add more threads, they all add to the waiting time, while we still only have one thread in the critical section. Thus, more competition dramatically increases the average lock-wait time.
+
+Why does the completion time per operation rise (less dramatically) with the number of contending threads?
+It increases since each thread must wait for the resource to be released to complete its work. However, since there is always one thread doing work, it is a less dramatic increase.
+
+How is it possible for the wait time per operation to go up faster (or higher) than the completion time per operation?
+Since each thread has its own timer for the wait time, there is some overlap when we add the times together at the end. The completion time, however, does not overlap since it only runs in the original thread.
+
+QUESTION 2.3.4 - Performance of Partitioned Lists
+Explain the change in performance of the synchronized methods as a function of the number of lists.
+As the number of lists increases, the performance improves.
+
+Should the throughput continue increasing as the number of lists is further increased? If not, explain why not.
+The throughput will eventually reach a limit since eventually each element will have its own sub list, so a thread will never have to wait for another one. At that point, increasing number of lists will stop improving throughput.
+
+It seems reasonable to suggest the throughput of an N-way partitioned list should be equivalent to the throughput of a single list with fewer (1/N) threads. Does this appear to be true in the above curves? If not, explain why not.
+This does not appear to be true according to my graphs. The curves seem to be fairly consistent across all number of threads, but I believe that's likely due to an error on my part in the program. I think it is likely that the throughput of an N-way partitioned list should be about the same as the throughput of a single list with 1/N threads.
+
+Included Files:
+SortedList.h - header file for circular doubly linked list
+
+SortedList.c - implementation of circular doubly linked list with functions to insert, delete, lookup, and find length of linked list
+
+lab2_list.c - the C code for the program that uses threads to perform operations on a linked list and reports on the success of such performance
+
+Makefile - contains 6 targets for building the executable, running tests to collect data, graph said data, run tests with a profiling tool, create a deliverable tarball, and delete programs.
+
+lab2b_list.csv - contains results from test runs
+
+profile.out - profiling report that shows how time was spent in original spin-lock immplementation
+
+lab2b_1.png - throughput vs. number of threads for mutex and spin-lock synchronized list operations.
+lab2b_2.png - mean time per mutex wait and mean time per operation for mutex-synchronized list operations.
+lab2b_3.png - successful iterations vs. threads for each synchronization method.
+lab2b_4.png - throughput vs. number of threads for mutex synchronized partitioned lists.
+lab2b_5.png - throughput vs. number of threads for spin-lock-synchronized partitioned lists.
+
+getListData.sh - contains all the tests ran
+
+lab2_list.gp - gnuplot script that generates graphs from csv file

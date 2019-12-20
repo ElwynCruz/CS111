@@ -1,0 +1,30 @@
+#NAME: Elwyn Cruz
+#EMAIL: ElwynCruz@g.ucla.edu
+#ID: 104977892
+
+
+.SILENT:
+
+build:
+
+	gcc -Wall -Wextra -g -lpthread -lprofiler -o lab2_list lab2_list.c SortedList.c
+tests:
+	rm -f lab2b_list.csv
+	-./getListData.sh
+graphs: tests
+	./lab2_list.gp
+
+
+profile: build
+	rm -f ./raw.gperf profile.out
+	LD_PRELOAD=/usr/lib/libprofiler.so
+	CPUPROFILE=./raw.gperf ./lab2_list --iterations=1000 --threads=12 --sync=s
+	pprof --text ./lab2_list ./raw.gperf > profile.out
+	pprof --list=threadFunc ./lab2_list ./raw.gperf >> profile.out
+	rm -f ./raw.gperf profile.gperf lab2_list
+
+dist: graphs profile
+	tar -czf lab2b-104977892.tar.gz Makefile README lab2_list.c SortedList.c SortedList.h getListData.sh *.png lab2b_list.csv lab2_list.gp profile.out
+
+clean:
+	rm -f lab2_list *.o *.tar.gz

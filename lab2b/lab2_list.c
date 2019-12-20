@@ -1,0 +1,403 @@
+
+//NAME: Elwyn Cruz
+//EMAIL: ElwynCruz@g.ucla.edu
+//ID: 104977892
+
+#include <pthread.h>
+#include "SortedList.h"
+#include <getopt.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <time.h>
+#include <ctype.h>
+
+#define BILLION 1E9
+
+int numLists = 1;
+int numThreads = 1;
+int numIterations = 1;
+int opt_yield = 0;
+char test[15];
+char* yield_ops = "none";
+SortedList_t *head = NULL;
+SortedListElement_t *elements = NULL;
+char syncType = 'n';
+
+pthread_mutex_t * mutex = NULL;
+int * spinlocks = NULL; 
+
+/*
+int hash(const char* key) {
+  int val = 89; // arbitrary prime number
+  while (*key != '\0') {
+    val += (int) *key;
+    key++;
+  }
+  return val % numLists;
+  }*/
+
+int hash(int num) {
+  return num % numLists;
+}
+
+
+char* rand_key() {
+  srand((unsigned int)time(NULL));
+  int length = 20;
+  char* key = malloc(length+1); //+1 for null char
+  int i;
+  for (i = 0; i < length; i++) {
+    char randChar = (rand() % 26) + 65;
+    int isLower = rand() % 2;
+    if (isLower) {
+      randChar = tolower(randChar);
+    }
+    key[i] = randChar;
+  }
+  key[length] = '\0';
+  return key;
+
+}
+
+
+
+void handler(int signum) {
+  if (signum == SIGSEGV) {
+    fprintf( stderr, "Segmentation fault caught. Error code: 2. Exiting now...\n");
+    exit(2);
+  }
+}
+
+// do thread stuff to list
+// arg - position of element array thread should start
+void * thread_list(void* arg) { 
+  long long total_time = 0;
+  int index = *((int*) arg);
+  int i;
+  struct timespec begin, end;
+
+  for(i=index; i < index+numIterations; i++) {
+    int listIndex = hash(i);
+    switch(syncType) {
+    case 'm':
+      clock_gettime(CLOCK_MONOTONIC, &begin);
+      pthread_mutex_lock(mutex + listIndex);
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      total_time += BILLION * (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
+      break;
+    case 's':
+      clock_gettime(CLOCK_MONOTONIC, &begin);
+      while(__sync_lock_test_and_set(spinlocks+listIndex, 1));
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      total_time += BILLION * (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
+      break;
+    }
+    
+    //insert
+
+    SortedList_insert(head+listIndex, elements + i);
+
+
+
+    switch (syncType) {
+    case 'm':
+      pthread_mutex_unlock(mutex + listIndex);
+      break;
+    case 's':
+      __sync_lock_release(spinlocks  + listIndex);
+      break;
+    }
+  }
+
+  int length = 0;
+  for(i=0; i < numLists; i++) {
+    switch(syncType) {
+    case 'm':
+      clock_gettime(CLOCK_MONOTONIC, &begin);
+      pthread_mutex_lock(&(mutex[i]));
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      total_time += BILLION * (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
+      break;
+    case 's':
+      clock_gettime(CLOCK_MONOTONIC, &begin);
+      while(__sync_lock_test_and_set(&(spinlocks[i]), 1));
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      total_time += BILLION * (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
+      break;
+    }
+    
+    length += SortedList_length(&head[i]);
+
+    if (length < 0) {
+      fprintf(stderr, "Error: length < 0, list corrupted\n");
+      exit(2);
+    }
+    
+    switch (syncType) {
+    case 'm':
+      pthread_mutex_unlock(&mutex[i]);
+      break;
+    case 's':
+      __sync_lock_release(&spinlocks[i]);
+    break;
+    }
+  }
+  
+  // delete each key we previously inserted
+  
+  for (i=index; i<index+numIterations; i++) {
+    int listIndex = hash(i);
+    switch(syncType) {
+    case 'm':
+      clock_gettime(CLOCK_MONOTONIC, &begin);
+      pthread_mutex_lock(&mutex[listIndex]);
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      total_time += BILLION * (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
+      break;
+    case 's':
+      clock_gettime(CLOCK_MONOTONIC, &begin);
+      while(__sync_lock_test_and_set(&spinlocks[listIndex], 1));
+      clock_gettime(CLOCK_MONOTONIC, &end);
+      total_time += BILLION * (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec);
+      break;
+    }
+    
+
+    
+    SortedListElement_t *curr = SortedList_lookup(&head[listIndex], elements[i].key);
+    if (curr == NULL) {
+      fprintf(stderr, "Error: lookup failed\n");
+      exit(2);
+    }
+    if (SortedList_delete(curr)) {
+      fprintf(stderr, "Error: delete failed\n");
+      exit(2);
+    }
+    
+    
+    
+    switch (syncType) {
+    case 'm':
+      pthread_mutex_unlock(&mutex[listIndex]);
+      break;
+    case 's':
+      __sync_lock_release(&spinlocks[listIndex]);
+      break;
+    }
+    
+  }
+
+  return (void *) total_time;
+}
+
+void getTest() {
+  char* base = "list-";
+  strcpy(test, base);
+  strcat(test, yield_ops);
+  strcat(test, "-");
+  switch (syncType) {
+  case 'm':
+  case 's':
+    strcat(test, &syncType);
+    break;
+  default:
+    strcat(test, "none");
+    break;
+  }
+}
+
+int main(int argc, char *argv[]) {
+
+  static struct option long_options[] = {
+    {"threads",    required_argument, 0, 't'},
+    {"iterations", required_argument, 0, 'i'},
+    {"yield",      required_argument, 0, 'y'},
+    {"sync",       required_argument, 0, 's'},
+    {"lists",       required_argument, 0, 'l'},
+    {  0   ,       0,                 0,  0 }
+  };
+
+  signal(SIGSEGV, handler); //watch for seg faults
+  
+  int c; 
+  while ( (c = getopt_long(argc, argv, "t:i:y:s:l:", long_options, NULL)) != -1) {
+    switch (c) {
+    case 't':
+      numThreads = atoi(optarg);
+      break;
+      
+    case 'i':
+      numIterations = atoi(optarg);
+      break;
+    case 'y':
+      if (strlen(optarg) > 3) {
+	fprintf( stderr, "Error: too many arguments to yield. Valid: --yield=[idl]\n");
+	exit(1);
+      }
+      unsigned int i;
+      for (i = 0; i < strlen(optarg); i++) {
+	yield_ops = optarg;
+	switch (optarg[i]) {
+	case 'i':
+	  opt_yield |= INSERT_YIELD;
+	  break;
+	case 'd':
+	  opt_yield |= DELETE_YIELD;
+	  break;
+	case 'l':
+	  opt_yield |= LOOKUP_YIELD;
+	  break;
+	default:
+	  fprintf(stderr, "Error: Bad argument to yield. Valid: --yield=[idl]\n");
+	  exit(1);
+	  break;
+	}
+      }
+      break;
+    case 's':
+      if (strlen(optarg) > 1) {
+	fprintf(stderr, "Error: too many arguments to sync\n");
+      }
+      syncType = optarg[0];
+      break;
+    case 'l':
+      numLists = atoi(optarg);
+      break;
+    default:
+      fprintf(stderr, "Error: invalid argument. Usage: ./lab2_list --thread=# --iterations=# --yield=[idl] --sync=[s|m]\n");
+      exit(1);
+    }
+  }
+  
+  // make numList number of heads
+
+  head = malloc(sizeof(SortedList_t) * numLists); 
+
+  int i;
+  for (i = 0; i < numLists; i++) {
+    head[i].prev = &head[i];
+    head[i].next = &head[i];
+    head[i].key = NULL;
+  }
+ 
+  // init elements w random keys
+  
+  int numElements = numThreads * numIterations;
+  elements = malloc(numElements * sizeof(SortedListElement_t));
+  for(i = 0; i < numElements; i++) {
+    elements[i].key = rand_key();
+  }
+  
+  // make threads
+  pthread_t* threads = (pthread_t*) malloc(numThreads*sizeof(pthread_t));
+  if (threads == NULL) {
+    fprintf(stderr, "Error: Could not allocate memory for threads\n");
+    free(elements);
+    free(head);
+    exit(1);
+  }
+  
+  int thread_args[numThreads];
+  for (i=0; i<numThreads;i++) {
+    thread_args[i] = i * numIterations;
+  }
+
+  // make locks
+  
+  if (syncType == 'm') {
+    if ((mutex = malloc(sizeof(pthread_mutex_t) * numLists)) == NULL) {
+      fprintf(stderr, "Error: not enough space for mutex locks\n");
+      exit(1);
+    } 
+    for (i=0; i<numLists;i++) {
+      pthread_mutex_init((mutex + i), NULL);
+    }
+  }
+  else if (syncType == 's') {
+    if ((spinlocks = malloc(sizeof(int) * numLists)) == NULL) {
+      fprintf(stderr, "Error: not enough space for spin locks\n");
+      exit(1);
+    }
+    for(i=0;i<numLists;i++) {
+      spinlocks[i] = 0;
+    }
+  }
+
+  // get start time
+  struct timespec start, fin;
+  if (clock_gettime(CLOCK_MONOTONIC, &start) < 0) {
+    fprintf(stderr, "Error: Failure in clock_gettime(). Exit with 1.\n");
+    free(threads);
+    free(elements);
+    free(head);
+    exit(1);
+  }
+ 
+ 
+ 
+ 
+  //create threads
+  
+
+  for(i=0; i < numThreads; i++) {
+
+    if (pthread_create(&threads[i], NULL, thread_list, &thread_args[i]) != 0) {
+      fprintf(stderr, "Error: pthread_create failed\n");
+      free(threads);
+      free(elements);
+      free(head);
+      exit(1);
+    }
+  }
+
+  // join threads
+
+  long long wait_time = 0;
+  void * wait;
+  for(i=0; i < numThreads; i++) {
+    if (pthread_join(threads[i], &wait) != 0) {
+      fprintf(stderr, "Error pthread_join failed\n");
+      free(threads);
+      free(elements);
+      free(head);
+      exit(1);
+    }
+    wait_time += (long long) wait;
+  }
+
+  // get end time
+  if (clock_gettime(CLOCK_MONOTONIC, &fin) < 0) {
+    fprintf(stderr, "Error: Failure in clock_gettime(). Exit with 1.\n");
+    
+    free(elements);
+    free(head);
+    exit(1);
+  }
+
+ 
+ 
+ 
+ 
+ 
+  
+  long long total_time = BILLION * (fin.tv_sec - start.tv_sec) + (fin.tv_nsec - start.tv_nsec);
+  long long operations = numThreads * numIterations * 3;
+  long long average_time =  total_time / operations;
+  long long lock_wait = wait_time / operations;
+  // getTest name
+  getTest();
+  printf("%s,%d,%d,%d,%lld,%lld,%lld,%lld\n", test, numThreads, numIterations, numLists, operations, total_time, average_time, lock_wait);
+  
+  free(threads);
+  free(elements);
+  free(head);
+  exit(0);
+  
+}
+
+
+
+

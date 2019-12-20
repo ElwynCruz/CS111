@@ -1,0 +1,110 @@
+//NAME: Elwyn Cruz
+//EMAIL: ElwynCruz@g.ucla.edu
+//ID: 104977892
+
+
+#include <string.h>
+#include <stdio.h>
+#include <sched.h>
+#include <stdlib.h>
+#include "SortedList.h"
+
+
+void SortedList_insert(SortedList_t *list, SortedListElement_t *element) {
+  if (list == NULL || element == NULL) {
+    return;
+  }  
+  SortedListElement_t *old = list;
+  SortedListElement_t *curr = old->next;
+
+  while (curr != list && strcmp(element->key, curr->key) >= 0) {
+    old = curr;
+    curr = curr->next;
+  }
+
+  if (opt_yield & INSERT_YIELD){
+    sched_yield();
+  }
+  //insert element
+  element->next = old->next;
+  element->prev = old;
+  old->next = element;
+  element->next->prev = element;
+  
+}
+
+int SortedList_delete( SortedListElement_t *element) {
+  if (element == NULL) {
+    printf("element null lmao");
+    return 1;
+  }
+  if (opt_yield & DELETE_YIELD) {
+    sched_yield();
+  }
+
+  SortedListElement_t* prev = element->prev;
+  SortedListElement_t* next = element->next;
+  
+  if (next->prev == element && prev->next == element){
+    prev->next = next;
+    next->prev = prev;
+    return 0;
+  }
+  
+  
+  if (element->next->prev != element) {  
+    return 1;
+  }
+  if (element->prev->next != element) {
+    return 1;
+  }
+  element->next->prev = element->prev;
+  element->prev->next = element->next;
+  return 0;
+  }
+
+/*
+int SortedList_delete( SortedListElement_t *element) {
+  if (element->next->prev != element || element->prev->next != element || element == NULL || element->key == NULL)
+    return 1;
+    
+  if (opt_yield & DELETE_YIELD)
+    pthread_yield();
+    
+  element->prev->next = element->next;
+  element->next->prev = element->prev;
+  return 0;
+  }*/
+SortedListElement_t *SortedList_lookup(SortedList_t *list, const char *key) {
+  if (list == NULL) {
+    return NULL;
+  }
+  
+  SortedListElement_t* cur = list->next;
+  while (cur != list) {
+    if (opt_yield & LOOKUP_YIELD) {
+      sched_yield();
+    }
+    if (strcmp(key, cur->key) == 0) {
+      return cur;
+    }
+    cur = cur->next;
+  }
+  return NULL;
+}
+
+int SortedList_length(SortedList_t *list) {
+  if (list == NULL) {
+    return -1;
+  }
+  int count = 0;
+  SortedListElement_t *cur = list->next;
+  while (cur != list) {
+    if (opt_yield & LOOKUP_YIELD) {
+      sched_yield();
+    }
+    cur = cur->next;
+    count++;
+  }
+  return count;
+}

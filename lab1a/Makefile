@@ -1,0 +1,10 @@
+#NAME: Elwyn Cruz
+#EMAIL: ElwynCruz@g.ucla.edu
+#ID: 104977892
+
+default:
+	gcc -Wextra -Wall -g -o lab1a lab1a.c
+dist:
+	tar -cvzf lab1a-104977892.tar.gz lab1a.c README Makefile
+clean:
+	rm -f lab1a lab1a-104977892.tar.gz

@@ -1,0 +1,32 @@
+NAME: Elwyn Cruz
+EMAIL: ElwynCruz@g.ucla.edu
+ID: 104977892
+SLIPDAYS: 0
+
+Included files:
+lab0.c - The C program that takes input and outputs the same input. Use --input=[file], --output=[file] to redirect input and output. Use --segfault to cause a segmentation fault and use --catch to catch the segmentation fault.
+
+Makefile - This contains the instructions for compiling the program using make, smoke tests to see if it works properly using make check, packaging into a tar file using make dist, and removal of created files using make clean.
+
+backtrace.png - A screenshot of gdb showing lab0 --segfault run until the segfault, then using bt to show the stack-trace.
+
+breakpoint.png - A screenshot of gdb using a breakpoint at the instruction right before the segfault, then inspecting the registers to see what would be modified should we proceed with the next instruction.
+
+README - this file, containing a description of included files and the smoke-test cases.
+
+Test Cases:
+
+testCatch: This tests to make sure the catch option works when used with the segfault option.
+testInput: This tests to make sure the input option successfully reads from an input file.
+testInputOutput: This runs the program using the input and output options and compares the resulting output file to the input file to ensure it is copying correctly.
+testOpenFile: This tests to make sure the program exits with the right exit code should it be unable to open the provided input file.
+testWriteFile: This tests to make sure the program exits with the right exit code should it be unable to write to the provided output file.
+testWrongArgs: This tests to make sure the program exits with the right exit code should it be provided unsupported arguments.
+
+Sources:
+https://askubuntu.com/questions/474556/hiding-output-of-a-command
+	Used to figure out how to hide the output from executing my tests.
+https://stackoverflow.com/questions/24005166/gnu-make-silent-by-default/24011502
+	Used to figure out how to run make check without printing all the code commands we use for the tests.
+https://www.gnu.org/software/bash/manual/html_node/Bash-Conditional-Expressions.html
+	Used to see which expressions to use for tests.
